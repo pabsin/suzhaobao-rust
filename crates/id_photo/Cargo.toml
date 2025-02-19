@@ -1,0 +1,43 @@
+[package]
+name = "id_photo"
+version.workspace = true
+description = "id photo"
+homepage.workspace = true
+documentation.workspace = true
+license.workspace = true
+edition.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[lib]
+doctest = false
+
+[dependencies]
+vegar_core.workspace = true
+salvo.workspace = true
+sea-orm.workspace = true
+serde.workspace = true
+async-trait.workspace = true
+chrono.workspace = true
+jsonwebtoken.workspace = true
+validator.workspace = true
+serde_json.workspace = true
+cuid.workspace = true
+mime.workspace = true
+opendal.workspace = true
+mime_guess.workspace = true
+data-encoding.workspace = true
+sha1.workspace = true
+hmac.workspace = true
+hyper.workspace = true
+educe.workspace = true
+serde_derive.workspace = true
+tempfile.workspace = true
+reqwest = { workspace = true, features = ["multipart", "json"]}
+serde_with = { workspace = true, features = ["macros"] }
+labrador = { workspace = true, features = ["wechat"]}
+redis.workspace = true
+url.workspace = true
+
+[lints]
+workspace = true
