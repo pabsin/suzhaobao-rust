@@ -2,6 +2,7 @@
 
 速照宝证件照换底色微信小程序源码，提供证件照制作、换底色等功能
 
+本项目是后端源码，前端源码在https://github.com/pabsin/suzhaobao
 
 # 预览
 ![preview.jpg](docs/images/preview.png)
@@ -13,31 +14,18 @@
 
 # ⭐最近更新
 - 二次开发源码来自: https://github.com/no1xuan/id-photo-wechat
-- 二开内容：采用Taro + Vite + Typescript重写，适配微信基础库版本：3.7.7
+- 二开内容：采用Taro + Vite + Typescript重写，适配微信基础库版本：3.7.7，后端采用Rust重写
 ------
 
-# 🔧部署
+# 🔧快速部署
 
-1. 复制`.env.development.example` 为`.env.development`
+1. 克隆本项目源码 `git clone https://github.com/pabsin/suzhaobao-rust.git`
 
-2. 修改其中`TARO_APP_ID`, `TARO_APP_NAME`, `TARO_APP_API_HOST`的值成你自己的
-   ![build.jpg](docs/images/build.png)
+2. 将config目录中的`default.example.toml`复制为`default.toml`, 修改配置文件
 
-3. 执行`pnpm install` 安装依赖
+3. 执行`cargo run`编译运行，如果没有rust环境，请下载已编译的二进制文件进行部署，如果有docker环境，也可以执行`docker compose up -d`部署
 
-4. 执行`pnpm build:weapp`进行构建
-
-5. 用微信开发者工具打开dist目录
-
-
-## 隐私协议
-
-![settings.jpg](docs/images/4.png)
-
-
-## 客服配置
-
-![custom.jpg](docs/images/10.png)
+4. 使用数据库管理工具将`database.sql`导入数据库
 
 
 ## 📧其它
