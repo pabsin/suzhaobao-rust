@@ -1,0 +1,48 @@
+# Use this workflow to trigger stable releases, both minor releases and patches
+
+name: Release
+
+run-name: "Release '${{ inputs.git-ref }}' (release type: ${{ inputs.release-type }}, publish: ${{ inputs.publish }}, latest: ${{ inputs.latest }})"
+
+on:
+  workflow_dispatch:
+    inputs:
+      git-ref:
+        required: true
+        type: string
+        default: main
+        description: "The git ref of this release"
+      release-type:
+        type: string
+        default: nightly
+        description: "The type of release, e.g. release, patch, nightly, alpha.1 or beta.1"
+      latest:
+        required: false
+        type: boolean
+        default: false
+        description: "Make this the latest release"
+      publish:
+        required: false
+        type: boolean
+        default: false
+        description: "Publish the release"
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release:
+    name: Prepare release
+    uses: ./.github/workflows/publish-version.yml
+    with:
+      git-ref: ${{ inputs.git-ref }}
+      latest: ${{ inputs.latest }}
+      release-type: ${{ inputs.release-type }}
+      publish: ${{ inputs.publish }}
+      create-release: ${{ inputs.publish }}
+    secrets: inherit

@@ -1,0 +1,50 @@
+services:
+  mariadb:
+    image: mariadb:11
+    restart: always
+    environment:
+      MARIADB_ROOT_PASSWORD: root-password
+      MARIADB_USER: suzhaobao
+      MARIADB_PASSWORD: password
+      MARIADB_DATABASE: suzhaobao
+      TZ: Asia/Shanghai
+    ports:
+      - '3306:3306'
+    volumes:
+      - ./mariadb:/var/lib/mysql:Z
+
+  redis:
+    image: bitnami/redis:latest
+    restart: always
+    ports:
+      - '6379:6379'
+    environment:
+      TZ: Asia/Shanghai
+      ALLOW_EMPTY_PASSWORD: yes
+
+  minio:
+    image: bitnami/minio:latest
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - ./minio:/bitnami/minio/data
+    environment:
+      TZ: Asia/Shanghai
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: miniosecret
+
+  suzhaobao:
+    image: micross/suzhaobao:latest
+    build:
+      context: .
+    ports:
+      - '5800:5800'
+    environment:
+      APP_DEBUG: true
+    depends_on:
+      - mariadb
+      - redis
+    volumes:
+      - ./config:/config'

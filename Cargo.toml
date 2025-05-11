@@ -1,0 +1,66 @@
+[workspace]
+members = ["crates/*"]
+resolver = "3"
+
+[workspace.package]
+edition = "2024"
+version = "0.0.1"
+license = "MIT"
+authors = ["Micross <me@tinlike.com>"]
+repository = "https://github.com/pabsin/suzhaobao-rust"
+homepage = "https://tinlike.com/"
+documentation = "https://tinlike.com/"
+
+[workspace.dependencies]
+vegar_core = { path = "./crates/core" }
+id_photo = { path = "./crates/id_photo" }
+
+salvo = { version = "0.78.0", features = ["affix-state", "anyhow", "jwt-auth", "cors"] }
+sea-orm = { version = "1.1.11", features = [
+    "sqlx-mysql",
+    "runtime-tokio-native-tls",
+    "macros",
+    "sqlx-sqlite",
+    "debug-print"
+] }
+
+serde = "1.0.219"
+serde_with = "3.12.0"
+tracing = "0.1.41"
+tracing-subscriber = "0.3.19"
+tokio = { version = "1.45.0", features = ["full"] }
+salvo_extra = "0.78.0"
+async-trait = "0.1.88"
+chrono = "0.4.41"
+thiserror = "2.0.12"
+argon2 = { version = "0.6.0-pre.1", features = ["std"] }
+jsonwebtoken = { version = "9.3.1" }
+validator = { version = "0.20.0", features = ["derive"] }
+hyper = "1.6.0"
+mime = "0.3.17"
+include_dir = "0.7.4"
+serde_json = "1.0.140"
+lettre = "0.11.15"
+educe = "0.6.0"
+opendal = {  version = "0.53.1", features = ["services-s3"] }
+mime_guess = "2.0.5"
+cuid = "1.3.3"
+oauth2 = "5.0.0"
+reqwest = { version = "0.12.15", features = ["json"] }
+config = "0.15.11"
+serde_derive = "1.0.219"
+lazy_static = "1.5.0"
+tempfile = "3.19.1"
+labrador = { version = "0.2.3"}
+regex = {version = "1.11.1"}
+data-encoding = { version = "2.9.0"}
+redis = { version = "0.31.0", features = ["tokio-comp"] }
+url = { version = "2.5.4"}
+rand = {version = "0.9.1"}
+
+[workspace.lints.rust]
+unreachable_pub = "deny"
+
+[workspace.lints.clippy]
+future_not_send = "warn"
+unwrap_used = "warn"

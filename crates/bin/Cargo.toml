@@ -1,0 +1,30 @@
+[package]
+name = "suzhaobao"
+version.workspace = true
+description = "速照宝"
+homepage.workspace = true
+documentation.workspace = true
+license.workspace = true
+edition.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[[bin]]
+name = "suzhaobao"
+path = "src/main.rs"
+
+[dependencies]
+vegar_core.workspace = true
+id_photo.workspace = true
+
+salvo.workspace = true
+sea-orm.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tokio.workspace = true
+salvo_extra.workspace = true
+redis.workspace = true
+educe.workspace = true
+
+[lints]
+workspace = true

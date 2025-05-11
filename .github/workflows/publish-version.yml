@@ -1,0 +1,338 @@
+on:
+  workflow_call:
+    inputs:
+      git-ref:
+        required: true
+        type: string
+        description: "The git ref of this release version. All 'actions/checkout' steps will use it"
+      release-type:
+        type: string
+        default: nightly
+        description: "The type of release, e.g. release, patch, nightly, alpha.1 or beta.1"
+      latest:
+        required: false
+        type: boolean
+        default: false
+        description: "Consider this release as the latest one and update the Docker image tag and the binary pointer for the installers"
+      publish:
+        required: false
+        type: boolean
+        default: false
+        description: "Whether to publish this release"
+      create-release:
+        required: false
+        type: boolean
+        default: false
+        description: "Create a GitHub release"
+      rust_version:
+        required: false
+        type: string
+        default: "1.85.0"
+        description: "The Rust version to use for building binaries"
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  prepare-vars:
+    name: Prepare vars
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.outputs.outputs.environment }}
+      version: ${{ steps.outputs.outputs.version }}
+      patch: ${{ steps.outputs.outputs.patch }}
+      current-version: ${{ steps.outputs.outputs.current-version }}
+      name: ${{ steps.outputs.outputs.name }}
+      build-metadata: ${{ steps.outputs.outputs.build-metadata }}
+      release-branch: ${{ steps.outputs.outputs.release-branch }}
+    steps:
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ inputs.rust_version }}
+
+      - name: Checkout sources
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.git-ref }}
+
+      - name: Set outputs
+        id: outputs
+        run: |
+          set -x
+
+          suffix=$(echo ${{ inputs.release-type }} | tr "." "\n" | sed -n 1p)
+          patch=$(echo ${{ inputs.release-type }} | tr "." "\n" | sed -n 2p)
+          version=$(cargo metadata --format-version 1 --no-deps | jq -r '.packages | map(select(.name == "suzhaobao"))[0].version')
+          echo "current-version=${version}" >> $GITHUB_OUTPUT
+
+          if [[ $version == *"-"* ]]; then
+            echo "Found an unexpected pre-release version, '${version}', in ${{ inputs.git-ref }}"
+            exit 400
+          fi
+
+          if [[ "${{ inputs.release-type }}" != "release" && "${{ inputs.release-type }}" != "patch" && "${{ inputs.release-type }}" != "nightly" && $suffix != "alpha" && $suffix != "beta" && $suffix != "rc" ]]; then
+            echo "'${{ inputs.release-type }}' is not a supported release type"
+            exit 400
+          fi
+
+          if [[ $suffix == "alpha" || $suffix == "beta" || $suffix == "rc" ]]; then
+            if [[ -z $patch ]]; then
+              echo "Pre-releases require a patch number, e.g. beta.3"
+              exit 400
+            elif ! [[ $patch =~ ^[0-9]+$ ]]; then
+              echo "The patch number should be an integer, found ${patch}"
+              exit 400
+            fi
+          fi
+
+          if [[ $suffix == "release" ]]; then
+            patch=$(echo ${version} | tr "." "\n" | sed -n 3p)
+            environment=stable
+          elif [[ $suffix == "patch" ]]; then
+            major=$(echo ${version} | tr "." "\n" | sed -n 1p)
+            minor=$(echo ${version} | tr "." "\n" | sed -n 2p)
+            currentPatch=$(echo ${version} | tr "." "\n" | sed -n 3p)
+            patch=$(($currentPatch + 1))
+            version=${major}.${minor}.${patch}
+            environment=stable
+          elif [[ $suffix == "nightly" ]]; then
+            date=$(git show --no-patch --format=%ad --date=format:%Y%m%d)
+            # This sets the nightly version to something like `1.3.20250224221932`
+            patch=$(git show --no-patch --format=%ad --date=format:%Y%m%d%H%M%S)
+            rev=$(git rev-parse --short HEAD)
+            buildMetadata=${date}.${rev}
+            version=${version}-${{ inputs.release-type }}
+            environment=${{ inputs.release-type }}
+          elif [[  $suffix == "rc" ]]; then
+            version=${version}-${{ inputs.release-type }}
+            patch=$(($patch - 1))
+            environment=release-candidate
+          else
+            version=${version}-${{ inputs.release-type }}
+            patch=$(($patch - 1))
+            environment=${suffix}
+          fi
+
+          echo "version=${version}" >> $GITHUB_OUTPUT
+          echo "patch=${patch}" >> $GITHUB_OUTPUT
+          echo "environment=${environment}" >> $GITHUB_OUTPUT
+          echo "build-metadata=${buildMetadata}" >> $GITHUB_OUTPUT
+          echo "release-branch=releases/${version}" >> $GITHUB_OUTPUT
+
+          if [[ "${environment}" == "nightly" ]]; then
+            echo "name=${environment}" >> $GITHUB_OUTPUT
+          else
+            echo "name=v${version}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Configure git
+        run: |
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git config --add --bool push.autoSetupRemote true
+
+      - name: Create release branch
+        run: |
+          set -x
+
+          git push origin --delete ${{ steps.outputs.outputs.release-branch }} || true
+          git checkout -b ${{ steps.outputs.outputs.release-branch }}
+
+      - name: Patch release version
+        if: ${{ inputs.release-type != 'release' }}
+        run: |
+          set -x
+          version=${{ steps.outputs.outputs.version }}
+          currentVersion=${{ steps.outputs.outputs.current-version }}
+
+      - name: Push the release branch
+        run: git push
+
+
+  docker-builder:
+    name: Prepare docker builder
+    runs-on: ubuntu-latest
+    needs: [prepare-vars]
+    outputs:
+      name: ${{ steps.image.outputs.name }}
+      tag: ${{ steps.image.outputs.tag }}
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare-vars.outputs.release-branch }}
+
+      - name: Prepare docker image name
+        id: image
+        run: |
+          set -x
+          # Use the github branch name so we can use modified builders on custom branches
+          tag=$(echo ${{ github.ref_name }} | sed -e 's/[^a-zA-Z0-9]/-/g')
+
+          echo "name=pabsin/suzhaobao-builder" >> $GITHUB_OUTPUT
+          echo "tag=${tag}" >> $GITHUB_OUTPUT
+
+  build:
+    name: Build ${{ matrix.arch }} binary
+    needs: [prepare-vars, docker-builder]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # MacOS amd64
+          - arch: x86_64-apple-darwin
+            runner: macos-latest
+            file: suzhaobao-${{ needs.prepare-vars.outputs.name }}.darwin-amd64
+            build-step: |
+              set -x
+
+              cargo build  --release --target x86_64-apple-darwin
+
+              # Package
+              cp target/x86_64-apple-darwin/release/suzhaobao suzhaobao
+              tar -zcvf suzhaobao-${{ needs.prepare-vars.outputs.name }}.darwin-amd64.tgz suzhaobao config docker-compose.yml database.sql
+              echo $(shasum -a 256 suzhaobao-${{ needs.prepare-vars.outputs.name }}.darwin-amd64.tgz | cut -f1 -d' ') > suzhaobao-${{ needs.prepare-vars.outputs.name }}.darwin-amd64.txt
+
+          # MacOS arm64
+          - arch: aarch64-apple-darwin
+            runner: macos-latest
+            file: suzhaobao-${{ needs.prepare-vars.outputs.name }}.darwin-arm64
+            build-step: |
+              set -x
+
+              cargo build --release --target aarch64-apple-darwin
+
+              # Package
+              cp target/aarch64-apple-darwin/release/suzhaobao suzhaobao
+              tar -zcvf suzhaobao-${{ needs.prepare-vars.outputs.name }}.darwin-arm64.tgz suzhaobao config docker-compose.yml database.sql
+              echo $(shasum -a 256 suzhaobao-${{ needs.prepare-vars.outputs.name }}.darwin-arm64.tgz | cut -f1 -d' ') > suzhaobao-${{ needs.prepare-vars.outputs.name }}.darwin-arm64.txt
+
+          # Linux amd64
+          - arch: x86_64-unknown-linux-gnu
+            runner: [ubuntu-latest]
+            file: suzhaobao-${{ needs.prepare-vars.outputs.name }}.linux-amd64
+            build-step: |
+
+              cargo build --target x86_64-unknown-linux-gnu ${extraFeatures} --release
+
+              # Package
+              cp target/x86_64-unknown-linux-gnu/release/suzhaobao suzhaobao
+              tar -zcvf suzhaobao-${{ needs.prepare-vars.outputs.name }}.linux-amd64.tgz suzhaobao config docker-compose.yml database.sql
+              echo $(shasum -a 256 suzhaobao-${{ needs.prepare-vars.outputs.name }}.linux-amd64.tgz | cut -f1 -d' ') > suzhaobao-${{ needs.prepare-vars.outputs.name }}.linux-amd64.txt
+
+          # Linux arm64
+          - arch: aarch64-unknown-linux-gnu
+            runner: [ubuntu-24.04-arm]
+            file: suzhaobao-${{ needs.prepare-vars.outputs.name }}.linux-arm64
+            build-step: |
+              set -x
+
+              cargo build --target aarch64-unknown-linux-gnu ${extraFeatures} --release
+
+              # Package
+              cp target/aarch64-unknown-linux-gnu/release/suzhaobao suzhaobao
+              tar -zcvf suzhaobao-${{ needs.prepare-vars.outputs.name }}.linux-arm64.tgz suzhaobao config docker-compose.yml database.sql
+              echo $(shasum -a 256 suzhaobao-${{ needs.prepare-vars.outputs.name }}.linux-arm64.tgz | cut -f1 -d' ') > suzhaobao-${{ needs.prepare-vars.outputs.name }}.linux-arm64.txt
+
+          # Windows amd64
+          - arch: x86_64-pc-windows-msvc
+            runner: windows-latest
+            file: suzhaobao-${{ needs.prepare-vars.outputs.name }}.windows-amd64
+            build-step: |
+              set -x
+
+              # Prepare deps
+              vcpkg integrate install
+
+              cargo build --release --target x86_64-pc-windows-msvc
+
+              # Package
+              cp target/x86_64-pc-windows-msvc/release/suzhaobao.exe suzhaobao.exe
+              tar -zcvf suzhaobao-${{ needs.prepare-vars.outputs.name }}.windows-amd64.tgz suzhaobao.exe config docker-compose.yml database.sql
+              echo $(certutil -hashfile suzhaobao-${{ needs.prepare-vars.outputs.name }}.windows-amd64.tgz SHA256 | sed -n '2p') > suzhaobao-${{ needs.prepare-vars.outputs.name }}.windows-amd64.txt
+
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare-vars.outputs.release-branch }}
+
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ inputs.rust_version }}
+          targets: ${{ matrix.arch }}
+
+      - name: Output package versions
+        run: |
+          set -x
+          set +e
+          cargo version ; rustc --version ; cmake --version ; gcc --version ; g++ --version ; perl -v
+
+      - name: Build step
+        env:
+          suzhaobao_BUILD_METADATA: ${{ needs.prepare-vars.outputs.build-metadata }}
+        run: ${{ matrix.build-step }}
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.file }}
+          path: |
+            suzhaobao
+            config
+            ${{ matrix.file }}.tgz
+            ${{ matrix.file }}.txt
+
+  publish:
+    name: Publish crate and artifacts binaries
+    needs: [prepare-vars, build]
+    runs-on: [ubuntu-latest]
+    steps:
+      - name: Download artifacts
+        if: ${{ inputs.publish }}
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        if: ${{ inputs.publish && inputs.create-release }}
+        with:
+          tag_name: v${{ needs.prepare-vars.outputs.version }}
+          name: "Release ${{ needs.prepare-vars.outputs.version }}"
+          body: "Release ${{ needs.prepare-vars.outputs.version }}"
+          target_commitish: ${{ needs.prepare-vars.outputs.release-branch }}
+          prerelease: ${{ needs.prepare-vars.outputs.environment != 'stable' }}
+          fail_on_unmatched_files: true
+          files: |
+            artifacts/suzhaobao-${{ needs.prepare-vars.outputs.name }}.*/*.tgz
+
+  docker:
+    name: Docker images
+    needs: [prepare-vars, publish]
+    if: ${{ inputs.publish }}
+    uses: ./.github/workflows/docker.yml
+    with:
+      environment: ${{ needs.prepare-vars.outputs.environment }}
+      git-ref: ${{ needs.prepare-vars.outputs.name }}
+      tag-prefix: ${{ needs.prepare-vars.outputs.name }}
+      latest: ${{ inputs.latest }}
+      build: true
+      push: true
+    secrets: inherit
+
+
+  cleanup:
+    name: Cleanup
+    needs: [publish, prepare-vars]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Delete ${{ needs.prepare-vars.outputs.release-branch }}
+        run: git push origin --delete ${{ needs.prepare-vars.outputs.release-branch }} || true

@@ -1,0 +1,32 @@
+[app]
+debug = false
+host = "http://127.0.0.1:5800"
+
+[database]
+dsn = "mysql://suzhaobao:password@mariadb:3306/suzhaobao"
+
+[redis]
+dsn = "redis://default@redis:6379/"
+
+[auth]
+jwt_secret = "abcdefghijklmn"
+
+[s3]
+region = "cn-guangxi"
+access_key_id = "minio-secret-key"
+secret_access_key = "minio-access-key"
+endpoint = "minio:9000"
+bucket = "suzhaobao"
+
+[id_photo_setting]
+safety_uri = "http://121.62.63.137:3006"
+zjz_uri = "http://121.62.63.137:8399"
+matting_uri = "http://121.62.63.137:8399"
+colorize_uri = "http://colourize.0po.cn"
+cartoon_uri = "http://cartoon.0po.cn"
+#人像分割模型 - 可选值：modnet_photographic_portrait_matting | hivision_modnet | rmbg-1.4 | birefnet-v1-lite
+human_matting_model = "hivision_modnet"
+#人脸检测模型 - 可选值：mtcnn | retinaface-resnet50
+face_detect_model = "mtcnn"
+#智能抠图模型 - 可选值：modnet_photographic_portrait_matting | hivision_modnet | rmbg-1.4 | birefnet-v1-lite
+matting_model = "birefnet-v1-lite"

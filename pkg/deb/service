@@ -1,0 +1,24 @@
+[Unit]
+Description=SuZhaoBao Service
+
+[Service]
+Type=simple
+ExecStart=/usr/share/suzhaobao/suzhaobao start
+WorkingDirectory=/usr/share/suzhaobao
+Restart=always
+
+KillMode=process
+
+LimitNOFILE=infinity
+
+LimitCORE=infinity
+
+; Environment variables:
+; Environment=APP_DEBUG=true
+; Environment=APP_HOST=http://127.0.0.1:5800
+; Environment=APP_DATABASE_DSN=mysql://suzhaobao:password@localhost:3306/suzhaobao
+; Environment=APP_REDIS_DSN=redis://default@redis:6379
+; Environment=APP_AUTH_JWT_SECRET=abcdefghijklmn
+
+[Install]
+WantedBy=multi-user.target
