@@ -40,7 +40,7 @@ hyper = "1.6.0"
 mime = "0.3.17"
 include_dir = "0.7.4"
 serde_json = "1.0.140"
-lettre = "0.11.15"
+lettre = "0.11.16"
 educe = "0.6.0"
 opendal = {  version = "0.53.1", features = ["services-s3"] }
 mime_guess = "2.0.5"
