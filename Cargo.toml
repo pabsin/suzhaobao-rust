@@ -50,7 +50,7 @@ reqwest = { version = "0.12.15", features = ["json"] }
 config = "0.15.11"
 serde_derive = "1.0.219"
 lazy_static = "1.5.0"
-tempfile = "3.19.1"
+tempfile = "3.20.0"
 labrador = { version = "0.2.3"}
 regex = {version = "1.11.1"}
 data-encoding = { version = "2.9.0"}
