@@ -14,7 +14,7 @@ services:
       - ./mariadb:/var/lib/mysql:Z
 
   redis:
-    image: bitnami/redis:latest
+    image: soldevelo/redis:latest
     restart: always
     ports:
       - '6379:6379'
@@ -23,7 +23,7 @@ services:
       ALLOW_EMPTY_PASSWORD: yes
 
   minio:
-    image: bitnami/minio:latest
+    image: soldevelo/minio:latest
     restart: always
     ports:
       - "9000:9000"
